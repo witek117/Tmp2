@@ -183,7 +183,8 @@ void LCD_resetDot(uint8_t digit)
 //--------------------------------------------------------------------------//
 void LCD_setUInt(uint16_t number, uint8_t form)
 {
-	if (form <= 1 || form >= 16) return;
+	if (form <= 1 || form > 16) return;
+	
 	for (uint8_t i = 0; i < 4; i++)
 	{
 		LCD_setNumber(number % form, i, 2);
@@ -196,7 +197,6 @@ void LCD_setUInt(uint16_t number, uint8_t form)
 //--------------------------------------------------------------------------//
 void LCD_setInt(int number)
 {
-	//if (form <= 1 || form >= 16) return;
 	if (number < 0)
 	{
 		number = - number;
