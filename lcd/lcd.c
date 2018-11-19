@@ -1,5 +1,6 @@
 #include "MKL46Z4.h"
 #include "lcd.h"
+#include "math.h"
 
 void LCD_Init(void)
 {
@@ -46,7 +47,7 @@ void LCD_Init(void)
 		LCD_PEN_PEN(1u << 18) | // LCD_P18
 		LCD_PEN_PEN(1u << 19);  // LCD_P19
 	LCD->PEN[1] =
-		LCD_PEN_PEN(1u << 5 ) | // LCD_P37
+		LCD_PEN_PEN(1u << (LCD_FRONT0 - 32) ) | // LCD_P37
 		LCD_PEN_PEN(1u << 6 ) | // LCD_P38
 		LCD_PEN_PEN(1u << 8 ) | // LCD_P40
 		LCD_PEN_PEN(1u << 20) | // LCD_P52
@@ -84,8 +85,8 @@ void LCD_Init(void)
 	LCD->WF[4] =
 		LCD_WF_WF16(0x00) |
 		LCD_WF_WF17(0x00) |
-		LCD_WF_WF18(0b10001000) | // COM3 (10001000)
-		LCD_WF_WF19(0b01000100); // COM2 (01000100)
+		LCD_WF_WF18(0x88) | // COM3 (10001000)
+		LCD_WF_WF19(0x44); // COM2 (01000100)
 	LCD->WF[5] =
 		LCD_WF_WF20(0x00) |
 		LCD_WF_WF21(0x00) |
@@ -112,7 +113,7 @@ void LCD_Init(void)
 		LCD_WF_WF38(0x00) |
 		LCD_WF_WF39(0x00);
 	LCD->WF[10] =
-		LCD_WF_WF40(0b00010001) | // COM0 (00010001)
+		LCD_WF_WF40(0x11) | // COM0 (00010001)
 		LCD_WF_WF41(0x00) |
 		LCD_WF_WF42(0x00) |
 		LCD_WF_WF43(0x00);
@@ -127,7 +128,7 @@ void LCD_Init(void)
 		LCD_WF_WF50(0x00) |
 		LCD_WF_WF51(0x00);
 	LCD->WF[13] =
-		LCD_WF_WF52(0b00100010) | // COM1 (00100010)
+		LCD_WF_WF52(0x22) | // COM1 (00100010)
 		LCD_WF_WF53(0x00) |
 		LCD_WF_WF54(0x00) |
 		LCD_WF_WF55(0x00);
@@ -157,34 +158,59 @@ void LCD_Init(void)
 //--------------------------------------------------------------------------//
 void LCD_setNumber(uint8_t number, uint8_t digit, uint8_t dot)
 {
-	 digit &= 0b00000011;  // zabezpieczenie zeby nie przekroczyc liczby 3, bo numercja jest od 0 do 3
-	// number &= 0b00001111; // zabezpieczenie zeby nie przekrocznyc liczby 15, bo znaków jest od 0 do 15
+	 digit &= 3;  // zabezpieczenie zeby nie przekroczyc liczby 3, bo numercja jest od 0 do 3
+	// number &= 15; // zabezpieczenie zeby nie przekrocznyc liczby 15, bo znaków jest od 0 do 15
 	if (dot == 2)
 	{
-		uint8_t oldDot = LCD->WF8B[digit_ABC[digit]] & 0b00000001;
-		LCD->WF8B[digit_ABC[digit]] = LCD_WF8B_LOW[number & 0b00001111] | oldDot;
+		uint8_t oldDot = LCD->WF8B[digit_FRONT_ABC[digit]] & 1;
+		LCD->WF8B[digit_FRONT_ABC[digit]] = LCD_WF8B_LOW[number & 15] | oldDot;
 	}
-	else LCD->WF8B[digit_ABC[digit]] = LCD_WF8B_LOW[number & 0b00001111] | (dot & 1);
-	LCD->WF8B[digit_DEFG[digit]] = LCD_WF8B_HIGH[number & 0b00001111];
+	else LCD->WF8B[digit_FRONT_ABC[digit]] = LCD_WF8B_LOW[number & 15] | (dot & 1);
+	LCD->WF8B[digit_FRONT_DEFG[digit]] = LCD_WF8B_HIGH[number & 15];
 }
 
 void LCD_setDot(uint8_t digit)
 {
-	LCD->WF8B[digit_ABC[digit & 0b00000011]] |= 0b00000001;
+	LCD->WF8B[digit_FRONT_ABC[digit & 3]] |= 1;
 }
 
 void LCD_resetDot(uint8_t digit)
 {
-	LCD->WF8B[digit_ABC[digit & 0b00000011]] &= ~0b00000001;
+	LCD->WF8B[digit_FRONT_ABC[digit & 3]] &= ~1;
+}
+//--------------------------------------------------------------------------//
+// errNumber = 1 - przekroczenie dodatnieko zakresu przy wejsciowym int //
+// errNumber = 2 - przekroczenie ujemnego zakresu przy wejsciowym int //
+// errNumber = 3 - podanie ujemnej wartosci przy wejsciowym int // 
+void LCD_Error(uint8_t errNumber)
+{
+	LCD->WF8B[LCD_FRONT0] = LCD_S_F | LCD_S_G | LCD_S_E | LCD_S_D; //E
+	LCD->WF8B[LCD_FRONT1] = LCD_S_A;
+	
+	LCD->WF8B[LCD_FRONT2] =  LCD_S_G | LCD_S_E ;									// r
+	LCD->WF8B[LCD_FRONT4] =  LCD_S_G | LCD_S_E ;									// r
+	
+	LCD_setNumber(errNumber, 0, 2);
 }
 //--------------------------------------------------------------------------//
 // number - liczba, jaka musi byc wyswietlona na wyswietlaczu
 // form - rormat wyswietlania, 16-HEX, 10-DEC, 8-OCT, 2-BIN
 //--------------------------------------------------------------------------//
 void LCD_setUInt(uint16_t number, uint8_t form)
-{
-	if (form <= 1 || form > 16) return;
+{	if(number<0)
+	{
+		LCD_Error(3);
+		return;
+	}
 	
+	uint16_t maxNumber = (uint16_t)pow((double)form,4.0) - 1;
+	if (number > maxNumber)
+	{
+		LCD_Error(1);
+		return;
+	}		
+	
+	if (form <= 1 || form > 16) return;
 	for (uint8_t i = 0; i < 4; i++)
 	{
 		LCD_setNumber(number % form, i, 2);
@@ -203,6 +229,11 @@ void LCD_setInt(int number)
 		LCD->WF8B[LCD_FRONT0] = LCD_S_G; // napisanie minusa na 3 wyswietlaczu,  najbardzije z lewej
 	}
 
+	if (number > 999)
+	{
+		LCD_Error(2);
+		return;
+	}
 	for (uint8_t i = 0; i < 3; i++)
 	{
 		LCD_setNumber(number % 10, i, 2);

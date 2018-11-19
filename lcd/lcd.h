@@ -17,6 +17,11 @@
 
 
 #include "MKL46Z4.h"   /* Device header */
+
+
+#define B_(x) strtoull(#x, 0, 2)
+
+
 // zdefiniowanie ilosci pinów na poszczególnych plaszczyznach
 #define LCD_N_FRONT 8
 #define LCD_N_BACK 4
@@ -47,7 +52,7 @@
 #define LCD_FRONT7 11u
 
 #define LCD_BACK0 40u
-#define LCD_BACK1 51u
+#define LCD_BACK1 52u
 #define LCD_BACK2 19u
 #define LCD_BACK3 18u
 // Zmienne tworzace dwie tablice
@@ -90,14 +95,14 @@ const static uint16_t LCD_WF8B_LOW[16] = {	LCD_S_C | LCD_S_B | LCD_S_A, 					// 
 
 };
 
-const static uint8_t digit_ABC[4] = {LCD_FRONT7,LCD_FRONT5,LCD_FRONT3,LCD_FRONT1};
-const static uint8_t digit_DEFG[4]= {LCD_FRONT6,LCD_FRONT4,LCD_FRONT2,LCD_FRONT0};
+const static uint8_t digit_FRONT_ABC[4] = {LCD_FRONT7,LCD_FRONT5,LCD_FRONT3,LCD_FRONT1};
+const static uint8_t digit_FRONT_DEFG[4]= {LCD_FRONT6,LCD_FRONT4,LCD_FRONT2,LCD_FRONT0};
 
 void LCD_Init(void);
 void LCD_setNumber(uint8_t number, uint8_t digit, uint8_t dot);
 void LCD_setDot(uint8_t digit);
 void LCD_resetDot(uint8_t digit);
-
+void LCD_Error(uint8_t errNumber);
 
 
 
